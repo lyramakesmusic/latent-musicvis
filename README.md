@@ -2,7 +2,7 @@
 
 Interactive 3D visualization of audio latent spaces using Stable Audio VAE + UMAP.
 
-![Demo](https://img.shields.io/badge/demo-live-brightgreen)
+![screenshot of a big blob of multicolored dots and glow, representing a playable 3d projection of the latents from encoding a song with the stable audio VAE](interface.png)
 
 ## Features
 
@@ -21,7 +21,7 @@ pip install -r requirements.txt
 
 # Set model paths (or place files in current directory)
 export VAE_CONFIG_PATH="path/to/stable_audio_2_0_vae.json"
-export VAE_CKPT_PATH="path/to/sao_vae_tune_100k_unwrapped.ckpt"
+export VAE_CKPT_PATH="path/to/sao_vae_tune_100k_unwrapped.ckpt" # or normal stable audio vae
 
 # Run server
 python server.py
@@ -92,4 +92,5 @@ Result: target's structure + source's timbre.
 ## License
 
 MIT
+
 
