@@ -9,9 +9,10 @@ Environment Variables:
 """
 
 import os
+import tempfile
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import Response, StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import numpy as np
@@ -35,7 +36,12 @@ LATENT_DIM = 64
 
 # Global VAE model
 vae = None
-device = "cuda" if torch.cuda.is_available() else "cpu"
+if torch.backends.mps.is_available():
+    device = "mps"
+elif torch.cuda.is_available():
+    device = "cuda"
+else:
+    device = "cpu"
 
 # Store original waveform for playback
 current_waveform: Optional[torch.Tensor] = None
@@ -123,10 +129,11 @@ def encode_audio_mock(waveform: torch.Tensor) -> torch.Tensor:
     """Mock encoding when VAE not available - extracts audio features as latents"""
     if waveform.dim() == 2:
         waveform = waveform.unsqueeze(0)
-    
+
+    waveform = waveform.to(device)
     batch, channels, samples = waveform.shape
     num_latents = samples // SAMPLES_PER_LATENT
-    
+
     latents = torch.zeros(batch, LATENT_DIM, num_latents, device=device)
     for i in range(num_latents):
         chunk = waveform[:, :, i*SAMPLES_PER_LATENT:(i+1)*SAMPLES_PER_LATENT]
@@ -139,8 +146,9 @@ def encode_audio_mock(waveform: torch.Tensor) -> torch.Tensor:
             bin_start = j * len(mag[0]) // 30
             bin_end = (j + 1) * len(mag[0]) // 30
             latents[:, j + 3, i] = mag[:, bin_start:bin_end].mean()
-        latents[:, 33:, i] = torch.randn(batch, LATENT_DIM - 33, device=device) * chunk.std().unsqueeze(-1)
-    
+        chunk_std = chunk.std()
+        latents[:, 33:, i] = torch.randn(batch, LATENT_DIM - 33, device=device) * chunk_std.unsqueeze(-1)
+
     return latents
 
 def decode_latents(latents: torch.Tensor) -> torch.Tensor:
@@ -339,38 +347,52 @@ async def encode_stream_endpoint(file: UploadFile = File(...)):
 async def audio_full_endpoint():
     """Return the full loaded audio as WAV"""
     global current_waveform
-    
+
     if current_waveform is None:
         raise HTTPException(status_code=400, detail="No audio loaded")
-    
-    buffer = io.BytesIO()
-    torchaudio.save(buffer, current_waveform, SAMPLE_RATE, format="wav")
-    buffer.seek(0)
-    
-    return Response(content=buffer.read(), media_type="audio/wav")
+
+    # Use temporary file since torchcodec doesn't support BytesIO
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        tmp_path = tmp.name
+
+    try:
+        torchaudio.save(tmp_path, current_waveform, SAMPLE_RATE)
+        with open(tmp_path, "rb") as f:
+            audio_data = f.read()
+        return Response(content=audio_data, media_type="audio/wav")
+    finally:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
 @app.post("/play")
 async def play_endpoint(request: PlayRequest):
     """Play original audio chunk for a latent index (2048 samples)"""
     global current_waveform
-    
+
     if current_waveform is None:
         raise HTTPException(status_code=400, detail="No audio loaded")
-    
+
     idx = request.index
     start = idx * SAMPLES_PER_LATENT
     end = start + SAMPLES_PER_LATENT
-    
+
     if end > current_waveform.shape[1]:
         raise HTTPException(status_code=400, detail=f"Index {idx} out of range")
-    
+
     chunk = current_waveform[:, start:end]
-    
-    buffer = io.BytesIO()
-    torchaudio.save(buffer, chunk, SAMPLE_RATE, format="wav")
-    buffer.seek(0)
-    
-    return Response(content=buffer.read(), media_type="audio/wav")
+
+    # Use temporary file since torchcodec doesn't support BytesIO
+    with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+        tmp_path = tmp.name
+
+    try:
+        torchaudio.save(tmp_path, chunk, SAMPLE_RATE)
+        with open(tmp_path, "rb") as f:
+            audio_data = f.read()
+        return Response(content=audio_data, media_type="audio/wav")
+    finally:
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
 
 @app.post("/resynth")
 async def resynth(file: UploadFile = File(...)):
@@ -426,15 +448,24 @@ async def resynth(file: UploadFile = File(...)):
         resynth_audio = decode_audio_chunked(resynth_tensor, chunk_latents=200)
         
         unload_vae()
-        
+
         audio_out = resynth_audio[0]
-        buffer = io.BytesIO()
-        torchaudio.save(buffer, audio_out, SAMPLE_RATE, format="wav")
-        buffer.seek(0)
-        
-        print(f"Resynth: complete, output {audio_out.shape[1]} samples")
-        
-        return Response(content=buffer.read(), media_type="audio/wav")
+
+        # Use temporary file since torchcodec doesn't support BytesIO
+        with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+            tmp_path = tmp.name
+
+        try:
+            torchaudio.save(tmp_path, audio_out, SAMPLE_RATE)
+            with open(tmp_path, "rb") as f:
+                audio_data = f.read()
+
+            print(f"Resynth: complete, output {audio_out.shape[1]} samples")
+
+            return Response(content=audio_data, media_type="audio/wav")
+        finally:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
         
     except Exception as e:
         import traceback
@@ -451,8 +482,14 @@ async def health():
         "num_latents": current_latents.shape[0] if current_latents is not None else 0
     }
 
+@app.get("/")
+async def root():
+    """Serve the explorer.html at root"""
+    from fastapi.responses import FileResponse
+    return FileResponse("explorer.html")
+
 # Serve static files (explorer.html)
-app.mount("/", StaticFiles(directory=".", html=True), name="static")
+app.mount("/static", StaticFiles(directory=".", html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn
