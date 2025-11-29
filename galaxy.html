@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Galaxy Explorer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Consolas', 'Monaco', monospace;
+      background: #000;
+      color: #fff;
+      overflow: hidden;
+    }
+
+    #container {
+      display: flex;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #canvas-area {
+      flex: 1;
+      position: relative;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    #controls {
+      width: 300px;
+      background: #111;
+      border-left: 1px solid #333;
+      padding: 15px;
+      overflow-y: auto;
+    }
+
+    .section {
+      margin-bottom: 20px;
+      border-bottom: 1px solid #222;
+      padding-bottom: 15px;
+    }
+
+    .section:last-child { border-bottom: none; }
+
+    h3 {
+      font-size: 12px;
+      color: #888;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      letter-spacing: 1px;
+    }
+
+    button {
+      background: #222;
+      color: #fff;
+      border: 1px solid #444;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 11px;
+      width: 100%;
+      margin-bottom: 5px;
+      transition: all 0.2s;
+    }
+
+    button:hover { background: #333; border-color: #666; }
+    button:active { background: #444; }
+    button:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    input[type="text"], input[type="number"] {
+      width: 100%;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #fff;
+      padding: 6px;
+      font-family: inherit;
+      font-size: 11px;
+      margin-bottom: 5px;
+    }
+
+    .slider-group {
+      margin-bottom: 10px;
+    }
+
+    .slider-group label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      margin-bottom: 3px;
+      color: #aaa;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      -webkit-appearance: none;
+      background: #222;
+      height: 4px;
+      border-radius: 2px;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      background: #fff;
+      cursor: pointer;
+      border-radius: 50%;
+    }
+
+    #status {
+      font-size: 10px;
+      color: #666;
+      padding: 8px;
+      background: #0a0a0a;
+      border-radius: 3px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+
+    #tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 5px;
+    }
+
+    .tag-chip {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      padding: 4px 8px;
+      font-size: 10px;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .tag-chip:hover { border-color: #666; }
+    .tag-chip.active { background: #333; border-color: #888; }
+
+    #steering-list {
+      font-size: 11px;
+    }
+
+    .steering-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 0;
+      border-bottom: 1px solid #1a1a1a;
+    }
+
+    .steering-weight {
+      width: 60px;
+    }
+
+    #info-overlay {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px;
+      border-radius: 5px;
+      font-size: 11px;
+      pointer-events: none;
+      max-width: 300px;
+    }
+
+    #generating-indicator {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 0, 0, 0.9);
+      border: 2px solid #fff;
+      padding: 20px 40px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: bold;
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    #progress-overlay {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.9);
+      border: 1px solid #444;
+      padding: 15px 25px;
+      border-radius: 8px;
+      min-width: 400px;
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    #progress-label {
+      font-size: 11px;
+      color: #aaa;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+
+    #progress-bar-container {
+      width: 100%;
+      height: 8px;
+      background: #222;
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    #progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #4a9eff, #6ec6ff);
+      width: 0%;
+      transition: width 0.3s ease;
+      border-radius: 4px;
+    }
+
+    #progress-text {
+      font-size: 10px;
+      color: #666;
+      margin-top: 5px;
+      text-align: center;
+      font-family: monospace;
+    }
+
+    .hidden { display: none; }
+
+    #point-info {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.9);
+      border: 1px solid #444;
+      padding: 8px;
+      border-radius: 3px;
+      font-size: 10px;
+      pointer-events: none;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div id="canvas-area">
+      <canvas id="canvas"></canvas>
+      <div id="info-overlay"></div>
+      <div id="point-info" class="hidden"></div>
+      <div id="generating-indicator" class="hidden">Generating...</div>
+      <div id="progress-overlay" class="hidden">
+        <div id="progress-label">Computing prior...</div>
+        <div id="progress-bar-container">
+          <div id="progress-bar"></div>
+        </div>
+        <div id="progress-text">0 / 1000</div>
+      </div>
+    </div>
+
+    <div id="controls">
+      <div class="section">
+        <h3>1. Build Galaxy</h3>
+        <div class="slider-group">
+          <label><span>Prior samples</span><span id="prior-samples-val">1000</span></label>
+          <input type="range" id="prior-samples-slider" min="100" max="5000" step="100" value="1000">
+        </div>
+        <button id="compute-prior-btn">Compute Prior</button>
+      </div>
+
+      <div class="section">
+        <h3>2. Add Tag Points</h3>
+        <input type="text" id="single-tag-input" placeholder="drums, piano, sfx, glitch, voice">
+        <div class="slider-group">
+          <label><span>Samples/tag</span><span id="tag-samples-val">10</span></label>
+          <input type="range" id="tag-samples-slider" min="5" max="100" value="10">
+        </div>
+        <button id="add-tag-btn">Add & Re-UMAP</button>
+      </div>
+
+      <div class="section">
+        <h3>3. Explore</h3>
+        <div class="slider-group">
+          <label><span>K clusters</span><span id="k-val">0</span></label>
+          <input type="range" id="k-slider" min="0" max="30" step="1" value="0">
+        </div>
+        <input type="text" id="filter-tags-input" placeholder="Filter tags: drums, piano, sfx...">
+        <div class="slider-group">
+          <label><span>Prior opacity</span><span id="prior-opacity-val">1.0</span></label>
+          <input type="range" id="prior-opacity" min="0" max="1" step="0.1" value="1.0">
+        </div>
+        <div class="slider-group">
+          <label><span>Tag opacity</span><span id="tag-opacity-val">1.0</span></label>
+          <input type="range" id="tag-opacity" min="0" max="1" step="0.1" value="1.0">
+        </div>
+        <div class="slider-group">
+          <label><span>Point size</span><span id="point-size-val">3</span></label>
+          <input type="range" id="point-size" min="1" max="10" step="1" value="3">
+        </div>
+        <div class="slider-group">
+          <label><span>Focus step</span><span id="focus-step-val">All</span></label>
+          <input type="range" id="focus-step" min="-1" max="7" step="1" value="-1">
+        </div>
+        <div style="margin-top: 10px;">
+          <label><input type="checkbox" id="show-trajectories" checked> Show trajectories</label>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>4. Steering</h3>
+        <div id="steering-list"></div>
+        <button id="generate-steered-btn" disabled>Generate</button>
+      </div>
+
+      <div class="section">
+        <h3>Status</h3>
+        <div id="status">Ready</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API = "http://localhost:8421";
+
+    // State
+    let galaxyData = null;
+    let rotation = { x: 0, y: 0 };
+    let zoom = 2;
+    let isDragging = false;
+    let lastMouse = { x: 0, y: 0 };
+    let hoveredPoint = null;
+    let steeringWeights = {};
+    let clusterK = 0;
+    let clusterAssignments = [];
+    let clusterColors = [];
+    let clusterCentroids = []; // Centroids in 3D space
+    let highlightedIndices = new Set(); // Track newly added samples
+    let filteredIndices = new Set(); // Track filtered tag points
+    let showTrajectories = true;
+    let focusStep = -1; // -1 = show all, 0-7 = focus on specific step
+
+    // Canvas
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const infoOverlay = document.getElementById('info-overlay');
+    const pointInfo = document.getElementById('point-info');
+
+    function resizeCanvas() {
+      canvas.width = canvas.offsetWidth * devicePixelRatio;
+      canvas.height = canvas.offsetHeight * devicePixelRatio;
+      ctx.scale(devicePixelRatio, devicePixelRatio);
+      render();
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // ============ UI ============
+
+    const priorSamplesSlider = document.getElementById('prior-samples-slider');
+    const priorSamplesVal = document.getElementById('prior-samples-val');
+    priorSamplesSlider.oninput = () => priorSamplesVal.textContent = priorSamplesSlider.value;
+
+    const tagSamplesSlider = document.getElementById('tag-samples-slider');
+    const tagSamplesVal = document.getElementById('tag-samples-val');
+    tagSamplesSlider.oninput = () => tagSamplesVal.textContent = tagSamplesSlider.value;
+
+    const kSlider = document.getElementById('k-slider');
+    const kVal = document.getElementById('k-val');
+    kSlider.oninput = () => {
+      clusterK = parseInt(kSlider.value);
+      kVal.textContent = clusterK;
+      if (clusterK > 0 && galaxyData) {
+        runKMeans();
+      } else {
+        clusterAssignments = [];
+      }
+      render();
+    };
+
+    const filterTagsInput = document.getElementById('filter-tags-input');
+    filterTagsInput.oninput = () => {
+      const filterText = filterTagsInput.value.trim();
+      filteredIndices.clear();
+
+      if (filterText && galaxyData) {
+        const filterTags = filterText.split(',').map(t => t.trim().toLowerCase()).filter(t => t);
+        galaxyData.metadata.forEach((meta, idx) => {
+          if (meta.type === 'tag' && filterTags.some(ft => meta.tag.toLowerCase().includes(ft))) {
+            filteredIndices.add(idx);
+          }
+        });
+      }
+
+      render();
+    };
+
+    const priorOpacitySlider = document.getElementById('prior-opacity');
+    const priorOpacityVal = document.getElementById('prior-opacity-val');
+    priorOpacitySlider.oninput = () => {
+      priorOpacityVal.textContent = priorOpacitySlider.value;
+      render();
+    };
+
+    const tagOpacitySlider = document.getElementById('tag-opacity');
+    const tagOpacityVal = document.getElementById('tag-opacity-val');
+    tagOpacitySlider.oninput = () => {
+      tagOpacityVal.textContent = tagOpacitySlider.value;
+      render();
+    };
+
+    const pointSizeSlider = document.getElementById('point-size');
+    const pointSizeVal = document.getElementById('point-size-val');
+    pointSizeSlider.oninput = () => {
+      pointSizeVal.textContent = pointSizeSlider.value;
+      render();
+    };
+
+    const showTrajectoriesCheckbox = document.getElementById('show-trajectories');
+    showTrajectoriesCheckbox.onchange = () => {
+      showTrajectories = showTrajectoriesCheckbox.checked;
+      render();
+    };
+
+    const focusStepSlider = document.getElementById('focus-step');
+    const focusStepVal = document.getElementById('focus-step-val');
+    focusStepSlider.oninput = () => {
+      focusStep = parseInt(focusStepSlider.value);
+      focusStepVal.textContent = focusStep === -1 ? 'All' : focusStep;
+      render();
+    };
+
+    function log(msg) {
+      const status = document.getElementById('status');
+      status.textContent = msg + '\n' + status.textContent.split('\n').slice(0, 5).join('\n');
+    }
+
+    // ============ K-MEANS ============
+
+    function runKMeans() {
+      if (!galaxyData || clusterK === 0) return;
+
+      const pts = galaxyData.projection;
+      const k = Math.min(clusterK, pts.length);
+
+      // K-means++ initialization
+      const centroids = [];
+      const firstIdx = Math.floor(Math.random() * pts.length);
+      centroids.push([...pts[firstIdx]]);
+
+      for (let i = 1; i < k; i++) {
+        const distances = pts.map(p => {
+          const minDist = Math.min(...centroids.map(c =>
+            Math.sqrt((p[0]-c[0])**2 + (p[1]-c[1])**2 + (p[2]-c[2])**2)
+          ));
+          return minDist ** 2;
+        });
+
+        const sum = distances.reduce((a, b) => a + b, 0);
+        let r = Math.random() * sum;
+        for (let j = 0; j < distances.length; j++) {
+          r -= distances[j];
+          if (r <= 0) {
+            centroids.push([...pts[j]]);
+            break;
+          }
+        }
+      }
+
+      // K-means iterations
+      const maxIter = 20;
+      clusterAssignments = new Array(pts.length).fill(0);
+
+      for (let iter = 0; iter < maxIter; iter++) {
+        // Assign to nearest centroid
+        for (let i = 0; i < pts.length; i++) {
+          let minDist = Infinity;
+          let bestCluster = 0;
+          for (let j = 0; j < k; j++) {
+            const dist = Math.sqrt(
+              (pts[i][0] - centroids[j][0]) ** 2 +
+              (pts[i][1] - centroids[j][1]) ** 2 +
+              (pts[i][2] - centroids[j][2]) ** 2
+            );
+            if (dist < minDist) {
+              minDist = dist;
+              bestCluster = j;
+            }
+          }
+          clusterAssignments[i] = bestCluster;
+        }
+
+        // Update centroids
+        const sums = Array(k).fill(0).map(() => [0, 0, 0]);
+        const counts = Array(k).fill(0);
+
+        for (let i = 0; i < pts.length; i++) {
+          const c = clusterAssignments[i];
+          sums[c][0] += pts[i][0];
+          sums[c][1] += pts[i][1];
+          sums[c][2] += pts[i][2];
+          counts[c]++;
+        }
+
+        for (let j = 0; j < k; j++) {
+          if (counts[j] > 0) {
+            centroids[j][0] = sums[j][0] / counts[j];
+            centroids[j][1] = sums[j][1] / counts[j];
+            centroids[j][2] = sums[j][2] / counts[j];
+          }
+        }
+      }
+
+      // Store centroids
+      clusterCentroids = centroids;
+
+      // Generate cluster colors
+      clusterColors = [];
+      for (let i = 0; i < k; i++) {
+        const hue = (i / k) * 360;
+        clusterColors.push(hslToRgb(hue / 360, 0.7, 0.6));
+      }
+    }
+
+    // ============ API ============
+
+    async function computePrior() {
+      const btn = document.getElementById('compute-prior-btn');
+      btn.disabled = true;
+
+      const nSamples = parseInt(priorSamplesSlider.value);
+      log(`Computing prior (${nSamples} samples)...`);
+
+      const progressOverlay = document.getElementById('progress-overlay');
+      const progressBar = document.getElementById('progress-bar');
+      const progressText = document.getElementById('progress-text');
+      const progressLabel = document.getElementById('progress-label');
+
+      progressOverlay.classList.remove('hidden');
+      progressLabel.textContent = 'Computing prior...';
+      progressBar.style.width = '0%';
+      progressText.textContent = `0 / ${nSamples}`;
+
+      const response = await fetch(`${API}/compute_prior`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ n_samples: nSamples, duration: 6.0, batch_size: 50, umap_update_interval: 10 })
+      });
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const text = decoder.decode(value);
+        const lines = text.split('\n').filter(l => l.startsWith('data:'));
+
+        for (const line of lines) {
+          const data = JSON.parse(line.slice(6));
+          if (data.stage === 'generating') {
+            const percent = (data.progress / data.total) * 100;
+            progressBar.style.width = `${percent}%`;
+            progressText.textContent = `${data.progress} / ${data.total}`;
+            log(`Prior: ${data.progress}/${data.total}`);
+          } else if (data.stage === 'umap_update') {
+            progressLabel.textContent = 'Running UMAP...';
+          } else if (data.stage === 'projection') {
+            // Progressive UMAP update - fetch data separately
+            const resp = await fetch(`${API}/galaxy_data`);
+            const galaxyUpdate = await resp.json();
+
+            if (!galaxyData) {
+              galaxyData = { projection: [], metadata: [], regions: null };
+            }
+            galaxyData.projection = galaxyUpdate.projection;
+            galaxyData.metadata = galaxyUpdate.metadata;
+            log(`UMAP: ${data.n_samples} samples`);
+            progressLabel.textContent = `Computing prior... (UMAP: ${data.n_samples})`;
+
+            // Re-run K-means if active
+            if (clusterK > 0) {
+              runKMeans();
+            }
+
+            render();
+          } else if (data.stage === 'final_umap') {
+            progressLabel.textContent = 'Final UMAP...';
+          } else if (data.stage === 'done') {
+            // Final projection - fetch data separately
+            const resp = await fetch(`${API}/galaxy_data`);
+            const galaxyUpdate = await resp.json();
+
+            if (!galaxyData) {
+              galaxyData = { projection: [], metadata: [], regions: null };
+            }
+            galaxyData.projection = galaxyUpdate.projection;
+            galaxyData.metadata = galaxyUpdate.metadata;
+            log(`Prior computed (${data.n_samples} samples)`);
+            document.getElementById('add-tag-btn').disabled = false;
+
+            // Re-run K-means if active
+            if (clusterK > 0) {
+              runKMeans();
+            }
+
+            progressOverlay.classList.add('hidden');
+            render();
+          } else if (data.stage === 'error') {
+            log(`Error: ${data.error}`);
+            progressOverlay.classList.add('hidden');
+          }
+        }
+      }
+
+      btn.disabled = false;
+    }
+
+    async function addTag() {
+      const btn = document.getElementById('add-tag-btn');
+      btn.disabled = true;
+
+      const tagsInput = document.getElementById('single-tag-input').value.trim();
+      const tags = tagsInput.split(',').map(t => t.trim()).filter(t => t);
+      const nSamples = parseInt(tagSamplesSlider.value);
+
+      if (tags.length === 0) {
+        log('Enter tags (comma-separated)');
+        btn.disabled = false;
+        return;
+      }
+
+      log(`Adding ${nSamples} samples each for: ${tags.join(', ')}`);
+
+      const progressOverlay = document.getElementById('progress-overlay');
+      const progressBar = document.getElementById('progress-bar');
+      const progressText = document.getElementById('progress-text');
+      const progressLabel = document.getElementById('progress-label');
+
+      progressOverlay.classList.remove('hidden');
+
+      const oldLength = galaxyData ? galaxyData.projection.length : 0;
+      let totalAdded = 0;
+
+      try {
+        for (let tagIdx = 0; tagIdx < tags.length; tagIdx++) {
+          const tag = tags[tagIdx];
+          progressLabel.textContent = `Adding ${tag} (${tagIdx + 1}/${tags.length})...`;
+          progressBar.style.width = '0%';
+          progressText.textContent = `0 / ${nSamples}`;
+
+          const response = await fetch(`${API}/add_tag_samples`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tag, n_samples: nSamples, duration: 6.0 })
+          });
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const text = decoder.decode(value);
+            const lines = text.split('\n').filter(l => l.startsWith('data:'));
+
+            for (const line of lines) {
+              const data = JSON.parse(line.slice(6));
+              if (data.stage === 'generating') {
+                const percent = (data.progress / data.total) * 100;
+                progressBar.style.width = `${percent}%`;
+                progressText.textContent = `${data.progress} / ${data.total}`;
+              } else if (data.stage === 'umap') {
+                progressLabel.textContent = `Re-running UMAP (${tagIdx + 1}/${tags.length})...`;
+              } else if (data.stage === 'done') {
+                // Fetch data separately (too large for SSE)
+                const resp = await fetch(`${API}/galaxy_data`);
+                const galaxyUpdate = await resp.json();
+                if (!galaxyData) {
+                  galaxyData = { projection: [], metadata: [], regions: null };
+                }
+                galaxyData.projection = galaxyUpdate.projection;
+                galaxyData.metadata = galaxyUpdate.metadata;
+                totalAdded += nSamples;
+                log(`Added ${tag}: ${nSamples} samples`);
+                render();
+              } else if (data.stage === 'error') {
+                log(`Error adding ${tag}: ${data.error}`);
+              }
+            }
+          }
+        }
+
+        // Highlight all newly added samples after all tags are done
+        highlightedIndices.clear();
+        for (let i = oldLength; i < galaxyData.projection.length; i++) {
+          highlightedIndices.add(i);
+        }
+
+        // Re-run K-means if it was active
+        if (clusterK > 0) {
+          runKMeans();
+        }
+
+        progressOverlay.classList.add('hidden');
+        log(`Done! Added ${totalAdded} total samples (${tags.length} tags)`);
+        render();
+
+      } catch (err) {
+        log(`Error: ${err.message}`);
+        progressOverlay.classList.add('hidden');
+      }
+
+      btn.disabled = false;
+    }
+
+    async function buildGalaxy() {
+      const btn = document.getElementById('build-galaxy-btn');
+      btn.disabled = true;
+
+      const tagsInput = document.getElementById('tags-input').value;
+      const tags = tagsInput.split(',').map(t => t.trim()).filter(t => t);
+      const samplesPerTag = parseInt(samplesSlider.value);
+
+      if (tags.length === 0) {
+        log('Enter tags first');
+        btn.disabled = false;
+        return;
+      }
+
+      log(`Building galaxy: ${tags.length} tags...`);
+
+      const response = await fetch(`${API}/build_galaxy`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tags, samples_per_tag: samplesPerTag, n_regions: 20 })
+      });
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const text = decoder.decode(value);
+        const lines = text.split('\n').filter(l => l.startsWith('data:'));
+
+        for (const line of lines) {
+          const data = JSON.parse(line.slice(6));
+          if (data.stage === 'computing_tag') {
+            log(`Tag: ${data.tag} (${data.progress}/${data.total})`);
+          } else if (data.stage === 'umap') {
+            log(`UMAP: ${data.n_points} points`);
+          } else if (data.stage === 'done') {
+            galaxyData = data;
+            initSteering();
+            log('Galaxy built');
+            render();
+            document.getElementById('generate-steered-btn').disabled = false;
+          } else if (data.stage === 'error') {
+            log(`Error: ${data.error}`);
+          }
+        }
+      }
+
+      btn.disabled = false;
+    }
+
+    function initSteering() {
+      if (!galaxyData) return;
+
+      const uniqueTags = [...new Set(galaxyData.metadata.filter(m => m.type === 'tag').map(m => m.tag))];
+      uniqueTags.forEach(tag => steeringWeights[tag] = 0);
+
+      renderSteeringControls();
+    }
+
+    function renderSteeringControls() {
+      const list = document.getElementById('steering-list');
+      list.innerHTML = '';
+
+      Object.keys(steeringWeights).forEach(tag => {
+        const item = document.createElement('div');
+        item.className = 'steering-item';
+
+        const label = document.createElement('span');
+        label.textContent = tag;
+
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.step = '0.1';
+        input.value = steeringWeights[tag];
+        input.className = 'steering-weight';
+        input.oninput = () => {
+          steeringWeights[tag] = parseFloat(input.value);
+        };
+
+        item.appendChild(label);
+        item.appendChild(input);
+        list.appendChild(item);
+      });
+    }
+
+    async function generateSteered() {
+      const components = Object.fromEntries(
+        Object.entries(steeringWeights).filter(([_, w]) => w !== 0)
+      );
+
+      if (Object.keys(components).length === 0) {
+        log('Set some steering weights');
+        return;
+      }
+
+      log('Generating with steering...');
+      const indicator = document.getElementById('generating-indicator');
+      indicator.classList.remove('hidden');
+
+      try {
+        const response = await fetch(`${API}/generate_steered`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            components,
+            prompt: '',
+            duration: 6.0,
+            seed: Math.floor(Math.random() * 10000),
+            injection_layer: 8,
+            injection_steps: [3, 4, 5]
+          })
+        });
+
+        const data = await response.json();
+
+        indicator.classList.add('hidden');
+
+        // Play audio
+        const audio = new Audio('data:audio/wav;base64,' + data.audio);
+        audio.play();
+
+        log(`Playing steered: ${Object.keys(components).join(', ')}`);
+      } catch (err) {
+        indicator.classList.add('hidden');
+        log(`Error: ${err.message}`);
+      }
+    }
+
+    // ============ RENDER ============
+
+    function project3D(point) {
+      // point = [x, y, z] in [-1, 1]
+      const [x, y, z] = point;
+
+      // Rotate
+      const cosX = Math.cos(rotation.x);
+      const sinX = Math.sin(rotation.x);
+      const cosY = Math.cos(rotation.y);
+      const sinY = Math.sin(rotation.y);
+
+      const y1 = y * cosX - z * sinX;
+      const z1 = y * sinX + z * cosX;
+
+      const x2 = x * cosY + z1 * sinY;
+      const z2 = -x * sinY + z1 * cosY;
+
+      // Perspective
+      const perspective = 3;
+      const scale = perspective / (perspective + z2);
+
+      const w = canvas.width / devicePixelRatio;
+      const h = canvas.height / devicePixelRatio;
+
+      const screenX = w / 2 + x2 * zoom * 200 * scale;
+      const screenY = h / 2 + y1 * zoom * 200 * scale;
+
+      return { x: screenX, y: screenY, scale, z: z2 };
+    }
+
+    function colorForType(type, tag, index, totalPrior, pointIndex) {
+      if (type === 'prior') {
+        // Rainbow gradient across all prior points
+        const hue = (index / totalPrior) * 360;
+        return hslToRgb(hue / 360, 0.6, 0.5);
+      }
+
+      // Hash tag to color
+      let hash = 0;
+      for (let i = 0; i < tag.length; i++) {
+        hash = tag.charCodeAt(i) + ((hash << 5) - hash);
+      }
+      const h = hash % 360;
+      return hslToRgb(h / 360, 0.7, 0.6);
+    }
+
+    function hslToRgb(h, s, l) {
+      let r, g, b;
+      if (s === 0) {
+        r = g = b = l;
+      } else {
+        const hue2rgb = (p, q, t) => {
+          if (t < 0) t += 1;
+          if (t > 1) t -= 1;
+          if (t < 1/6) return p + (q - p) * 6 * t;
+          if (t < 1/2) return q;
+          if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+          return p;
+        };
+        const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+        const p = 2 * l - q;
+        r = hue2rgb(p, q, h + 1/3);
+        g = hue2rgb(p, q, h);
+        b = hue2rgb(p, q, h - 1/3);
+      }
+      return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+    }
+
+    function render() {
+      const w = canvas.width / devicePixelRatio;
+      const h = canvas.height / devicePixelRatio;
+
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, w, h);
+
+      if (!galaxyData) {
+        ctx.fillStyle = '#333';
+        ctx.font = '12px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('Build galaxy to visualize', w / 2, h / 2);
+        return;
+      }
+
+      const priorOpacity = parseFloat(priorOpacitySlider.value);
+      const tagOpacity = parseFloat(tagOpacitySlider.value);
+      const pointSize = parseInt(pointSizeSlider.value);
+
+      const nPrior = galaxyData.metadata.filter(m => m.type === 'prior').length;
+
+      // Project all points
+      const points = galaxyData.projection.map((pos, i) => ({
+        pos,
+        meta: galaxyData.metadata[i],
+        projected: project3D(pos),
+        index: i
+      }));
+
+      // Sort by depth (back to front) - furthest first
+      // Larger z = further away, should render first
+      points.sort((a, b) => b.projected.z - a.projected.z);
+
+      // Draw cluster glows at centroids (if K-means active)
+      if (clusterK > 0 && clusterCentroids.length > 0) {
+        clusterCentroids.forEach((centroid, k) => {
+          const centroidProj = project3D(centroid);
+          const { x, y, scale } = centroidProj;
+
+          if (x < 0 || x > w || y < 0 || y > h) return;
+
+          // Calculate max distance from centroid to cluster points
+          const clusterPoints = points.filter(p => clusterAssignments[p.index] === k);
+          let maxDist = 0;
+          clusterPoints.forEach(p => {
+            const dist = Math.hypot(
+              p.pos[0] - centroid[0],
+              p.pos[1] - centroid[1],
+              p.pos[2] - centroid[2]
+            );
+            if (dist > maxDist) maxDist = dist;
+          });
+
+          // Clamp maxDist to reasonable values
+          maxDist = Math.min(maxDist, 0.8); // Don't let clusters get too huge
+
+          // Glow at centroid
+          const glowSize = maxDist * zoom * 200 * 1.2;
+          const [r, g, b] = clusterColors[k] || [255, 255, 255];
+
+          const gradient = ctx.createRadialGradient(x, y, 0, x, y, glowSize);
+          gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.25)`);
+          gradient.addColorStop(0.3, `rgba(${r}, ${g}, ${b}, 0.12)`);
+          gradient.addColorStop(0.6, `rgba(${r}, ${g}, ${b}, 0.03)`);
+          gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(x, y, glowSize, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      // Draw filtered points glow
+      if (filteredIndices.size > 0) {
+        points.forEach(({ pos, meta, projected, index }) => {
+          if (!filteredIndices.has(index)) return;
+
+          const { x, y, scale } = projected;
+          if (x < 0 || x > w || y < 0 || y > h) return;
+
+          const glowSize = pointSize * scale * 4;
+          const gradient = ctx.createRadialGradient(x, y, 0, x, y, glowSize);
+          gradient.addColorStop(0, 'rgba(255, 255, 100, 0.3)');
+          gradient.addColorStop(0.5, 'rgba(255, 255, 100, 0.1)');
+          gradient.addColorStop(1, 'rgba(255, 255, 100, 0)');
+
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(x, y, glowSize, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      }
+
+      // Draw trajectory lines (before points)
+      if (showTrajectories && galaxyData) {
+        // Group points by gen_id
+        const trajectories = {};
+        points.forEach(({ pos, meta, projected, index }) => {
+          if (meta.gen_id !== undefined && meta.step !== undefined) {
+            if (!trajectories[meta.gen_id]) {
+              trajectories[meta.gen_id] = [];
+            }
+            trajectories[meta.gen_id].push({ step: meta.step, projected, meta });
+          }
+        });
+
+        // Draw lines for each trajectory with rainbow gradient
+        Object.values(trajectories).forEach(traj => {
+          // Sort by step
+          traj.sort((a, b) => a.step - b.step);
+
+          // Draw each segment with rainbow hue based on step
+          ctx.lineWidth = 1;
+          for (let i = 0; i < traj.length - 1; i++) {
+            const step = traj[i].step;
+            const hue = (step / 7) * 300; // 0 to 300 (red to purple, skip full wrap to red)
+            const [r, g, b] = hslToRgb(hue / 360, 0.7, 0.5);
+
+            // Dim lines not involving focused step
+            let lineAlpha = 0.4;
+            if (focusStep !== -1 && step !== focusStep && traj[i + 1].step !== focusStep) {
+              lineAlpha = 0.05;
+            }
+
+            ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${lineAlpha})`;
+            ctx.beginPath();
+            ctx.moveTo(traj[i].projected.x, traj[i].projected.y);
+            ctx.lineTo(traj[i + 1].projected.x, traj[i + 1].projected.y);
+            ctx.stroke();
+          }
+        });
+      }
+
+      // Render points (on top of glows and lines)
+      points.forEach(({ pos, meta, projected, index }) => {
+        const { x, y, scale, z } = projected;
+
+        if (x < 0 || x > w || y < 0 || y > h) return;
+
+        const isPrior = meta.type === 'prior';
+        let opacity = isPrior ? priorOpacity : tagOpacity;
+        const size = pointSize * scale;
+
+        // Depth-based dimming: further away (larger positive z) = dimmer
+        // Closer (smaller/negative z) = brighter
+        const depthFactor = Math.max(0.3, Math.min(1.0, 1.0 - (z / 4))); // Invert: larger z = dimmer
+        opacity *= depthFactor;
+
+        let [r, g, b] = colorForType(meta.type, meta.tag, meta.index || index, nPrior, index);
+
+        // Step-based brightness gradient (step 0 = darker, step 7 = brighter)
+        if (meta.step !== undefined) {
+          const stepBrightness = 0.4 + (meta.step / 7) * 0.6; // 0.4 to 1.0
+          r *= stepBrightness;
+          g *= stepBrightness;
+          b *= stepBrightness;
+        }
+
+        // Dim points not matching focused step
+        if (focusStep !== -1 && meta.step !== focusStep) {
+          opacity *= 0.1;
+        }
+
+        // Draw point with depth dimming (cluster state doesn't affect point color)
+        ctx.fillStyle = `rgba(${r * depthFactor}, ${g * depthFactor}, ${b * depthFactor}, ${opacity})`;
+
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // Info overlay
+      const nTags = galaxyData.metadata.filter(m => m.type === 'tag').length;
+      infoOverlay.textContent = `Prior: ${nPrior} | Tags: ${nTags} | Zoom: ${zoom.toFixed(2)} | Rot: ${rotation.x.toFixed(2)}, ${rotation.y.toFixed(2)}`;
+    }
+
+    // ============ INTERACTION ============
+
+    canvas.addEventListener('mousedown', e => {
+      isDragging = true;
+      lastMouse = { x: e.clientX, y: e.clientY };
+    });
+
+    canvas.addEventListener('mousemove', e => {
+      if (isDragging) {
+        const dx = e.clientX - lastMouse.x;
+        const dy = e.clientY - lastMouse.y;
+        rotation.y -= dx * 0.01; // Inverted
+        rotation.x -= dy * 0.01; // Inverted
+        lastMouse = { x: e.clientX, y: e.clientY };
+        render();
+      }
+
+      // Hover detection
+      if (galaxyData) {
+        const rect = canvas.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+
+        let closest = null;
+        let minDist = 20;
+
+        galaxyData.projection.forEach((pos, i) => {
+          const proj = project3D(pos);
+          const dist = Math.hypot(proj.x - mx, proj.y - my);
+          if (dist < minDist) {
+            minDist = dist;
+            closest = { pos, meta: galaxyData.metadata[i], proj, index: i };
+          }
+        });
+
+        if (closest) {
+          hoveredPoint = closest;
+          pointInfo.style.left = `${e.clientX + 15}px`;
+          pointInfo.style.top = `${e.clientY + 15}px`;
+
+          let label = closest.meta.type === 'prior' ? 'Prior' : `Tag: ${closest.meta.tag}`;
+          if (clusterK > 0 && clusterAssignments.length > 0 && closest.index < clusterAssignments.length) {
+            const cluster = clusterAssignments[closest.index];
+            if (cluster !== undefined) {
+              label += ` | Cluster ${cluster}`;
+            }
+          }
+          if (closest.meta.seed !== undefined) {
+            label += ` | Seed ${closest.meta.seed}`;
+          }
+          if (closest.meta.step !== undefined) {
+            label += ` | Step ${closest.meta.step}`;
+          }
+          pointInfo.textContent = label;
+          pointInfo.classList.remove('hidden');
+        } else {
+          hoveredPoint = null;
+          pointInfo.classList.add('hidden');
+        }
+      }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    canvas.addEventListener('click', async (e) => {
+      if (!galaxyData) return;
+
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+
+      // Find clicked point
+      let closest = null;
+      let minDist = 15;
+
+      galaxyData.projection.forEach((pos, i) => {
+        const proj = project3D(pos);
+        const dist = Math.hypot(proj.x - mx, proj.y - my);
+        if (dist < minDist) {
+          minDist = dist;
+          closest = { pos, meta: galaxyData.metadata[i], index: i };
+        }
+      });
+
+      if (closest) {
+        const label = closest.meta.type === 'prior' ? `prior seed ${closest.meta.seed}` : closest.meta.tag;
+        log(`Generating: ${label}`);
+
+        const indicator = document.getElementById('generating-indicator');
+        indicator.classList.remove('hidden');
+
+        try {
+          const response = await fetch(`${API}/generate_point`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              point_type: closest.meta.type,
+              tag: closest.meta.tag || '',
+              seed: closest.meta.seed,
+              duration: 6.0
+            })
+          });
+
+          const data = await response.json();
+
+          indicator.classList.add('hidden');
+
+          // Play audio
+          const audio = new Audio('data:audio/wav;base64,' + data.audio);
+          audio.play();
+
+          log(`Playing: ${label}`);
+        } catch (err) {
+          indicator.classList.add('hidden');
+          log(`Error: ${err.message}`);
+        }
+      }
+    });
+
+    canvas.addEventListener('wheel', e => {
+      e.preventDefault();
+      zoom *= (1 - e.deltaY * 0.001);
+      zoom = Math.max(0.5, Math.min(10, zoom));
+      render();
+    });
+
+    // Buttons
+    document.getElementById('compute-prior-btn').onclick = computePrior;
+    document.getElementById('add-tag-btn').onclick = addTag;
+    document.getElementById('generate-steered-btn').onclick = generateSteered;
+
+  </script>
+</body>
+</html>

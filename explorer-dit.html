@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DiT Hidden State Explorer</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap');
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: #0a0a0f;
+      color: #c8c8d8;
+      overflow: hidden;
+    }
+    #app {
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      padding: 14px 20px;
+      border-bottom: 1px solid #1f1f2e;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: linear-gradient(180deg, #12121a 0%, #0d0d14 100%);
+      flex-wrap: wrap;
+    }
+    .header h1 {
+      font-size: 14px;
+      font-weight: 500;
+      color: #8b5cf6;
+      letter-spacing: 0.5px;
+    }
+    .header h1 span {
+      color: #4b4b6b;
+      font-weight: 400;
+    }
+    
+    .prompt-container {
+      flex: 1;
+      display: flex;
+      gap: 8px;
+      min-width: 300px;
+    }
+    .prompt-input {
+      flex: 1;
+      padding: 10px 14px;
+      background: #16161f;
+      border: 1px solid #2a2a3d;
+      border-radius: 6px;
+      color: #e8e8f0;
+      font-family: inherit;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .prompt-input:focus {
+      border-color: #8b5cf6;
+      box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+    }
+    .prompt-input::placeholder { color: #4b4b6b; }
+    
+    .generate-btn {
+      padding: 10px 20px;
+      background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+      border: none;
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      font-weight: 500;
+      transition: transform 0.1s, box-shadow 0.2s;
+    }
+    .generate-btn:hover { 
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+    }
+    .generate-btn:disabled { opacity: 0.5; cursor: wait; }
+    
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: #16161f;
+      border-radius: 6px;
+      border: 1px solid #2a2a3d;
+    }
+    .control-group label {
+      font-size: 11px;
+      color: #6b6b8b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .control-group input[type="number"] {
+      background: #0d0d14;
+      border: 1px solid #2a2a3d;
+      border-radius: 4px;
+      color: #c8c8d8;
+      font-family: inherit;
+      font-size: 12px;
+      padding: 4px 8px;
+      width: 50px;
+      text-align: center;
+      outline: none;
+    }
+    
+    .status {
+      font-size: 12px;
+      color: #6b6b8b;
+      padding: 6px 12px;
+      background: #16161f;
+      border-radius: 4px;
+      border: 1px solid #2a2a3d;
+    }
+    .status.generating { color: #f59e0b; border-color: #78350f; background: rgba(245, 158, 11, 0.1); }
+    .status.ready { color: #22c55e; border-color: #166534; background: rgba(34, 197, 94, 0.1); }
+    .status.error { color: #ef4444; border-color: #7f1d1d; background: rgba(239, 68, 68, 0.1); }
+    
+    #canvas-container {
+      flex: 1;
+      position: relative;
+      background: radial-gradient(ellipse at center, #12121a 0%, #0a0a0f 100%);
+    }
+    
+    .info-panel {
+      position: absolute;
+      bottom: 80px;
+      left: 20px;
+      background: rgba(12, 12, 18, 0.95);
+      padding: 14px 18px;
+      border-radius: 8px;
+      border: 1px solid #2a2a3d;
+      font-size: 12px;
+      display: none;
+      backdrop-filter: blur(8px);
+    }
+    .info-panel.visible { display: block; }
+    .info-panel .row { display: flex; gap: 16px; margin-bottom: 4px; }
+    .info-panel .label { color: #6b6b8b; }
+    .info-panel .value { color: #8b5cf6; font-weight: 500; }
+    
+    .layer-legend {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(12, 12, 18, 0.95);
+      padding: 14px 18px;
+      border-radius: 8px;
+      border: 1px solid #2a2a3d;
+      font-size: 10px;
+      backdrop-filter: blur(8px);
+      display: none;
+    }
+    .layer-legend.visible { display: block; }
+    .layer-legend .title {
+      color: #8b5cf6;
+      font-weight: 500;
+      margin-bottom: 10px;
+      font-size: 11px;
+    }
+    .layer-legend .layer-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 3px;
+    }
+    .layer-legend .layer-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+    .layer-legend .layer-label { color: #8b8ba0; }
+    .layer-legend .layer-desc { color: #4b4b6b; font-size: 9px; }
+    
+    .footer {
+      padding: 12px 20px;
+      border-top: 1px solid #1f1f2e;
+      font-size: 11px;
+      color: #4b4b6b;
+      background: linear-gradient(180deg, #0d0d14 0%, #0a0a0f 100%);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .footer-text { flex-shrink: 0; }
+    
+    .playbar-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      opacity: 0.3;
+      pointer-events: none;
+    }
+    .playbar-container.enabled { opacity: 1; pointer-events: auto; }
+    .playbar-time {
+      font-size: 11px;
+      color: #8b8ba0;
+      font-variant-numeric: tabular-nums;
+      min-width: 40px;
+    }
+    .playbar-time.end { text-align: right; }
+    
+    .playbar {
+      flex: 1;
+      height: 4px;
+      background: #1f1f2e;
+      border-radius: 2px;
+      cursor: pointer;
+      position: relative;
+    }
+    .playbar-progress {
+      height: 100%;
+      background: linear-gradient(90deg, #8b5cf6, #a78bfa, #c4b5fd);
+      border-radius: 2px;
+      width: 0%;
+    }
+    .playbar-handle {
+      position: absolute;
+      left: 0%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      width: 12px;
+      height: 12px;
+      background: #fff;
+      border-radius: 50%;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+    
+    .play-btn {
+      padding: 8px 16px;
+      background: #22c55e;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      display: none;
+    }
+    .play-btn:hover { background: #16a34a; }
+    .play-btn.stop { background: #ef4444; }
+    .play-btn.stop:hover { background: #dc2626; }
+    
+    .volume-control { display: flex; align-items: center; gap: 6px; }
+    .volume-icon { font-size: 14px; cursor: pointer; user-select: none; }
+    .volume-slider {
+      width: 60px;
+      height: 4px;
+      -webkit-appearance: none;
+      background: #2a2a3d;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+    .volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 10px;
+      height: 10px;
+      background: #8b5cf6;
+      border-radius: 50%;
+    }
+    
+    .layer-filter {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .layer-filter label { font-size: 10px; color: #6b6b8b; }
+    .layer-filter input[type="range"] {
+      width: 100px;
+      height: 4px;
+      -webkit-appearance: none;
+      background: linear-gradient(90deg, #ef4444, #f59e0b, #22c55e, #06b6d4, #8b5cf6);
+      border-radius: 2px;
+    }
+    .layer-filter input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      background: #fff;
+      border-radius: 50%;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div class="header">
+      <h1>DiT Hidden State Explorer <span>// all layers</span></h1>
+      
+      <div class="prompt-container">
+        <input type="text" class="prompt-input" id="prompt-input" 
+               placeholder="neurofunk bass drop dark growling" 
+               value="neurofunk bass drop dark growling">
+        <button class="generate-btn" id="generate-btn">Generate</button>
+      </div>
+      
+      <div class="controls">
+        <div class="control-group">
+          <label>Duration</label>
+          <input type="number" id="duration-input" value="6" min="1" max="30" step="1">
+          <span style="color:#6b6b8b;font-size:11px">s</span>
+        </div>
+        <div class="control-group">
+          <label>Steps</label>
+          <input type="number" id="steps-input" value="8" min="1" max="50" step="1">
+        </div>
+        <div class="control-group">
+          <label>CFG</label>
+          <input type="number" id="cfg-input" value="4" min="1" max="15" step="0.5">
+        </div>
+      </div>
+      
+      <span class="status" id="status">Ready to generate</span>
+    </div>
+    
+    <div id="canvas-container"></div>
+    
+    <div class="info-panel" id="info-panel">
+      <div class="row">
+        <span class="label">Step</span>
+        <span class="value" id="info-step">0</span>
+      </div>
+      <div class="row">
+        <span class="label">Layer</span>
+        <span class="value" id="info-layer">0</span>
+      </div>
+      <div class="row">
+        <span class="label">Position</span>
+        <span class="value" id="info-pos">0</span>
+      </div>
+    </div>
+    
+    
+    <div class="footer">
+      <span class="footer-text" id="footer-text">Enter a prompt and click Generate</span>
+      <button class="play-btn" id="play-btn">▶ Play</button>
+      <button class="play-btn" id="arrows-toggle" style="background:#6366f1;display:none">🌈 Arrows</button>
+      <button class="play-btn" id="animate-flow" style="background:#f59e0b;display:none">⚡ Animate</button>
+      <div class="layer-filter" id="flow-filter" style="display:none;flex:1;max-width:600px">
+        <label>Flow:</label>
+        <input type="range" id="flow-slider" min="-1" max="127" value="-1" step="1" list="flow-ticks" style="flex:1">
+        <datalist id="flow-ticks"></datalist>
+        <span id="flow-value" style="font-size:10px;color:#8b8ba0;min-width:80px">All</span>
+        <button class="play-btn" id="flow-play-btn" style="background:#f59e0b;display:none;margin-left:8px">▶ Flow</button>
+      </div>
+      <div class="playbar-container" id="playbar-container" style="display:none">
+        <span class="playbar-time" id="playbar-current">0:00</span>
+        <div class="playbar" id="playbar">
+          <div class="playbar-progress" id="playbar-progress"></div>
+          <div class="playbar-handle" id="playbar-handle"></div>
+        </div>
+        <span class="playbar-time end" id="playbar-duration">0:00</span>
+        <div class="volume-control">
+          <span class="volume-icon" id="volume-icon">🔊</span>
+          <input type="range" id="volume-slider" min="0" max="100" value="100" class="volume-slider">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+
+    const API_URL = window.location.origin;
+    
+    // State
+    let projection = [];
+    let metadata = [];  // [{step, layer, position}, ...]
+    let audioInfo = null;
+    let hoveredIdx = null;
+    let audioContext = null;
+    let currentSource = null;
+    let audioBuffer = null;
+    let highlightStep = -1;  // -1 = all steps visible
+    let highlightLayer = -1;  // -1 = all layers visible
+    
+    // Three.js
+    let scene, camera, renderer, points, material;
+    let spherical = { theta: 0, phi: Math.PI / 2, radius: 5 };
+    let isDragging = false;
+    let previousMouse = { x: 0, y: 0 };
+    let autoRotate = true;
+    
+    // Playback
+    let playbackStartTime = 0;
+    let isFullPlaying = false;
+    let glowPoints = null;
+    let baseColors = null;
+    let baseSizes = null;
+    let gainNode = null;
+    let currentVolume = 1.0;
+
+    // Arrows mode
+    let arrowsOnlyMode = false;
+    let lines = null;
+    let highlightGlows = [];
+    let glowTexture = null;
+    
+    // DOM
+    const container = document.getElementById('canvas-container');
+    const statusEl = document.getElementById('status');
+    const generateBtn = document.getElementById('generate-btn');
+    const promptInput = document.getElementById('prompt-input');
+    const durationInput = document.getElementById('duration-input');
+    const stepsInput = document.getElementById('steps-input');
+    const cfgInput = document.getElementById('cfg-input');
+    const infoPanel = document.getElementById('info-panel');
+    const playBtn = document.getElementById('play-btn');
+    const footerText = document.getElementById('footer-text');
+    const flowSlider = document.getElementById('flow-slider');
+    const flowValue = document.getElementById('flow-value');
+    const arrowsToggle = document.getElementById('arrows-toggle');
+
+    // Arrows only toggle
+    arrowsToggle.addEventListener('click', () => {
+      arrowsOnlyMode = !arrowsOnlyMode;
+      arrowsToggle.textContent = arrowsOnlyMode ? '⚫ Points' : '🌈 Arrows';
+      arrowsToggle.style.background = arrowsOnlyMode ? '#a855f7' : '#6366f1';
+
+      if (points) points.visible = !arrowsOnlyMode;
+    });
+    
+    // Generate
+    generateBtn.addEventListener('click', generate);
+    promptInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') generate(); });
+    
+    async function generate() {
+      const prompt = promptInput.value.trim();
+      if (!prompt) return;
+      
+      generateBtn.disabled = true;
+      generateBtn.textContent = 'Generating...';
+      statusEl.textContent = 'Generating + extracting all layers...';
+      statusEl.className = 'status generating';
+      
+      if (isFullPlaying) stopFullPlayback();
+      
+      try {
+        const response = await fetch(`${API_URL}/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: prompt,
+            duration: parseFloat(durationInput.value),
+            steps: parseInt(stepsInput.value),
+            cfg_scale: parseFloat(cfgInput.value)
+          })
+        });
+        
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.detail || 'Generation failed');
+        }
+        
+        const data = await response.json();
+        
+        projection = data.projection;
+        metadata = data.metadata;
+        audioInfo = {
+          duration: data.duration_seconds,
+          numPositions: data.num_positions,
+          numLayers: data.num_layers,
+          totalPoints: data.total_points,
+          samplesPerLatent: data.samples_per_latent,
+          prompt: data.prompt
+        };
+        
+        // Decode audio
+        const audioBytes = Uint8Array.from(atob(data.audio_base64), c => c.charCodeAt(0));
+        if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        audioBuffer = await audioContext.decodeAudioData(audioBytes.buffer);
+        
+        const numSteps = data.num_steps || 1;
+        statusEl.textContent = `${data.total_points} points (${numSteps > 1 ? numSteps + ' steps × ' : ''}16 layers × ${data.num_positions} positions)`;
+        statusEl.className = 'status ready';
+        footerText.textContent = `${data.num_positions} positions × 16 layers = ${data.total_points} points`;
+
+        playBtn.style.display = 'inline-block';
+        arrowsToggle.style.display = 'inline-block';
+        document.getElementById('flow-filter').style.display = 'flex';
+        document.getElementById('flow-play-btn').style.display = 'inline-block';
+        flowSlider.max = numSteps * 16 - 1;
+
+        // Add step ticks to datalist
+        const ticksList = document.getElementById('flow-ticks');
+        ticksList.innerHTML = '';
+        // Add "All" tick
+        const allOption = document.createElement('option');
+        allOption.value = -1;
+        allOption.label = 'All';
+        ticksList.appendChild(allOption);
+        // Add step ticks
+        for (let step = 0; step < numSteps; step++) {
+          const option = document.createElement('option');
+          option.value = step * 16;
+          option.label = `S${step}`;
+          ticksList.appendChild(option);
+        }
+        
+        initThreeJS();
+        
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = `Error: ${err.message}`;
+        statusEl.className = 'status error';
+      } finally {
+        generateBtn.disabled = false;
+        generateBtn.textContent = 'Generate';
+      }
+    }
+    
+    // Flow slider (combines step and layer)
+    flowSlider.addEventListener('input', (e) => {
+      const flowIndex = parseInt(e.target.value);
+      if (flowIndex === -1) {
+        highlightStep = -1;
+        highlightLayer = -1;
+        flowValue.textContent = 'All';
+      } else {
+        highlightStep = Math.floor(flowIndex / 16);
+        highlightLayer = flowIndex % 16;
+        flowValue.textContent = `S${highlightStep} L${highlightLayer}`;
+      }
+      updateVisibility();
+    });
+
+    function updateVisibility() {
+      if (!points || !baseColors || !scene) return;
+
+      const colors = points.geometry.attributes.color.array;
+      const positions = points.geometry.attributes.position.array;
+
+      // Clear old glows
+      highlightGlows.forEach(g => scene.remove(g));
+      highlightGlows = [];
+
+      for (let i = 0; i < metadata.length; i++) {
+        const m = metadata[i];
+        const step = m.step !== undefined ? m.step : 0;
+        const stepMatch = highlightStep === -1 || step === highlightStep;
+        const layerMatch = highlightLayer === -1 || m.layer === highlightLayer;
+        const isHighlighted = stepMatch && layerMatch;
+
+        if (isHighlighted) {
+          colors[i * 3] = baseColors[i * 3];
+          colors[i * 3 + 1] = baseColors[i * 3 + 1];
+          colors[i * 3 + 2] = baseColors[i * 3 + 2];
+
+          // Add glow sprite for highlighted points
+          if ((highlightStep !== -1 || highlightLayer !== -1) && glowTexture) {
+            const glowMat = new THREE.SpriteMaterial({
+              map: glowTexture,
+              color: new THREE.Color(baseColors[i * 3], baseColors[i * 3 + 1], baseColors[i * 3 + 2]),
+              transparent: true,
+              opacity: 0.35,
+              blending: THREE.AdditiveBlending,
+              depthWrite: false
+            });
+            const glow = new THREE.Sprite(glowMat);
+            glow.scale.set(0.3, 0.3, 1);
+            glow.position.set(positions[i * 3], positions[i * 3 + 1], positions[i * 3 + 2]);
+            scene.add(glow);
+            highlightGlows.push(glow);
+          }
+        } else {
+          colors[i * 3] = baseColors[i * 3] * 0.15;
+          colors[i * 3 + 1] = baseColors[i * 3 + 1] * 0.15;
+          colors[i * 3 + 2] = baseColors[i * 3 + 2] * 0.15;
+        }
+      }
+
+      points.geometry.attributes.color.needsUpdate = true;
+    }
+    
+    // Playback
+    playBtn.addEventListener('click', toggleFullPlayback);
+    
+    // Flow slider playback
+    let isFlowPlaying = false;
+    let flowPlaybackInterval = null;
+    let flowPlaybackTriggeredByCode = false;
+    const flowPlayBtn = document.getElementById('flow-play-btn');
+    
+    flowPlayBtn.addEventListener('click', () => {
+      if (isFlowPlaying) {
+        stopFlowPlayback();
+      } else {
+        startFlowPlayback();
+      }
+    });
+    
+    function startFlowPlayback() {
+      // Stop audio playback if active
+      if (isFullPlaying) stopFullPlayback();
+      
+      isFlowPlaying = true;
+      flowPlayBtn.textContent = '⏹ Flow';
+      flowPlayBtn.classList.add('stop');
+      
+      const startValue = parseInt(flowSlider.value);
+      const maxValue = parseInt(flowSlider.max);
+      
+      // If at end, restart from beginning
+      if (startValue >= maxValue) {
+        flowPlaybackTriggeredByCode = true;
+        flowSlider.value = -1;
+        flowSlider.dispatchEvent(new Event('input'));
+        flowPlaybackTriggeredByCode = false;
+      }
+      
+      // Auto-advance every 200ms
+      flowPlaybackInterval = setInterval(() => {
+        if (!isFlowPlaying) return;
+        
+        const currentValue = parseInt(flowSlider.value);
+        const maxVal = parseInt(flowSlider.max);
+        
+        let nextValue = currentValue + 1;
+        
+        // Loop when reaching end
+        if (nextValue > maxVal) {
+          nextValue = -1; // Start over from beginning
+        }
+        
+        flowPlaybackTriggeredByCode = true;
+        flowSlider.value = nextValue;
+        flowSlider.dispatchEvent(new Event('input'));
+        flowPlaybackTriggeredByCode = false;
+      }, 80);
+    }
+    
+    function stopFlowPlayback() {
+      isFlowPlaying = false;
+      flowPlayBtn.textContent = '▶ Flow';
+      flowPlayBtn.classList.remove('stop');
+      
+      if (flowPlaybackInterval) {
+        clearInterval(flowPlaybackInterval);
+        flowPlaybackInterval = null;
+      }
+    }
+    
+    // Stop flow playback when user manually adjusts slider
+    flowSlider.addEventListener('input', () => {
+      if (isFlowPlaying && !flowPlaybackTriggeredByCode) {
+        stopFlowPlayback();
+      }
+    });
+    
+    const playbarContainer = document.getElementById('playbar-container');
+    const playbar = document.getElementById('playbar');
+    const playbarProgress = document.getElementById('playbar-progress');
+    const playbarHandle = document.getElementById('playbar-handle');
+    const playbarCurrent = document.getElementById('playbar-current');
+    const playbarDuration = document.getElementById('playbar-duration');
+    const volumeSlider = document.getElementById('volume-slider');
+    const volumeIcon = document.getElementById('volume-icon');
+    
+    volumeSlider.addEventListener('input', (e) => {
+      currentVolume = e.target.value / 100;
+      if (gainNode) gainNode.gain.value = currentVolume;
+      volumeIcon.textContent = currentVolume === 0 ? '🔇' : currentVolume < 0.5 ? '🔉' : '🔊';
+    });
+    
+    volumeIcon.addEventListener('click', () => {
+      currentVolume = currentVolume > 0 ? 0 : 1;
+      volumeSlider.value = currentVolume * 100;
+      if (gainNode) gainNode.gain.value = currentVolume;
+      volumeIcon.textContent = currentVolume === 0 ? '🔇' : '🔊';
+    });
+    
+    function formatTime(s) { return `${Math.floor(s/60)}:${Math.floor(s%60).toString().padStart(2,'0')}`; }
+    
+    async function toggleFullPlayback() {
+      if (isFullPlaying) { stopFullPlayback(); return; }
+      await startPlaybackAt(0);
+    }
+    
+    async function startPlaybackAt(offset) {
+      if (!audioBuffer) return;
+      if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      if (!gainNode) { gainNode = audioContext.createGain(); gainNode.connect(audioContext.destination); gainNode.gain.value = currentVolume; }
+      if (currentSource) { currentSource.onended = null; currentSource.stop(); }
+      
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(gainNode);
+      source.onended = stopFullPlayback;
+      
+      offset = Math.max(0, Math.min(offset, audioBuffer.duration - 0.1));
+      playbackStartTime = audioContext.currentTime - offset;
+      source.start(0, offset);
+      currentSource = source;
+      isFullPlaying = true;
+      
+      playBtn.textContent = '⏹ Stop';
+      playBtn.classList.add('stop');
+      playbarContainer.classList.add('enabled');
+      playbarDuration.textContent = formatTime(audioBuffer.duration);
+    }
+    
+    function stopFullPlayback() {
+      if (currentSource) { currentSource.stop(); currentSource = null; }
+      isFullPlaying = false;
+      playBtn.textContent = '▶ Play';
+      playBtn.classList.remove('stop');
+      
+      // Stop flow playback too (mutual exclusion)
+      stopFlowPlayback();
+
+      // Reset colors
+      if (points && baseColors) {
+        updateVisibility();
+      }
+      if (glowPoints && scene) { scene.remove(glowPoints); glowPoints = null; }
+
+      playbarContainer.classList.remove('enabled');
+      playbarProgress.style.width = '0%';
+      playbarHandle.style.left = '0%';
+      playbarCurrent.textContent = '0:00';
+    }
+    
+    playbar.addEventListener('click', (e) => {
+      if (!audioBuffer) return;
+      const rect = playbar.getBoundingClientRect();
+      const pct = (e.clientX - rect.left) / rect.width;
+      if (isFullPlaying) startPlaybackAt(pct * audioBuffer.duration);
+    });
+    
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT') return;
+      if (e.code === 'Space') { e.preventDefault(); if (audioBuffer) toggleFullPlayback(); }
+      else if (e.code === 'ArrowLeft' && isFullPlaying) { e.preventDefault(); startPlaybackAt(Math.max(0, audioContext.currentTime - playbackStartTime - 5)); }
+      else if (e.code === 'ArrowRight' && isFullPlaying) { e.preventDefault(); startPlaybackAt(Math.min(audioBuffer.duration, audioContext.currentTime - playbackStartTime + 5)); }
+    });
+    
+    function updatePlaybackVisualization() {
+      if (!isFullPlaying || !audioContext || !projection.length) return;
+
+      const elapsed = audioContext.currentTime - playbackStartTime;
+      const currentPosition = Math.floor(elapsed * SAMPLE_RATE / (audioInfo?.samplesPerLatent || 2048));
+
+      if (audioBuffer) {
+        const pct = (elapsed / audioBuffer.duration) * 100;
+        playbarProgress.style.width = `${Math.min(100, pct)}%`;
+        playbarHandle.style.left = `${Math.min(100, pct)}%`;
+        playbarCurrent.textContent = formatTime(elapsed);
+      }
+
+      if (!points || !baseColors) return;
+
+      const colors = points.geometry.attributes.color.array;
+
+      // Highlight all points at current time position
+      for (let i = 0; i < metadata.length; i++) {
+        const m = metadata[i];
+        const step = m.step !== undefined ? m.step : 0;
+        const stepMatch = highlightStep === -1 || step === highlightStep;
+        const layerMatch = highlightLayer === -1 || m.layer === highlightLayer;
+        const isFiltered = stepMatch && layerMatch;
+        const isCurrentTime = m.position === currentPosition;
+        const isRecentTime = m.position >= currentPosition - 3 && m.position <= currentPosition;
+
+        if (isCurrentTime && isFiltered) {
+          // Bright white for current position
+          colors[i * 3] = 1;
+          colors[i * 3 + 1] = 1;
+          colors[i * 3 + 2] = 1;
+        } else if (isRecentTime && isFiltered) {
+          // Fade trail
+          const fade = 1 - (currentPosition - m.position) / 4;
+          colors[i * 3] = baseColors[i * 3] + (1 - baseColors[i * 3]) * fade;
+          colors[i * 3 + 1] = baseColors[i * 3 + 1] + (1 - baseColors[i * 3 + 1]) * fade;
+          colors[i * 3 + 2] = baseColors[i * 3 + 2] + (1 - baseColors[i * 3 + 2]) * fade;
+        } else if (isFiltered) {
+          // Dim past/future
+          colors[i * 3] = baseColors[i * 3] * 0.4;
+          colors[i * 3 + 1] = baseColors[i * 3 + 1] * 0.4;
+          colors[i * 3 + 2] = baseColors[i * 3 + 2] * 0.4;
+        } else {
+          // Not in filter
+          colors[i * 3] = baseColors[i * 3] * 0.1;
+          colors[i * 3 + 1] = baseColors[i * 3 + 1] * 0.1;
+          colors[i * 3 + 2] = baseColors[i * 3 + 2] * 0.1;
+        }
+      }
+
+      points.geometry.attributes.color.needsUpdate = true;
+    }
+
+    const SAMPLE_RATE = 44100;
+
+    // Three.js
+    function initThreeJS() {
+      container.innerHTML = '';
+      
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0a0a0f);
+      
+      camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
+      camera.position.z = 5;
+      
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      container.appendChild(renderer.domElement);
+      
+      // Glow texture
+      const glowCanvas = document.createElement('canvas');
+      glowCanvas.width = 128;
+      glowCanvas.height = 128;
+      const ctx = glowCanvas.getContext('2d');
+      const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+      gradient.addColorStop(0, 'rgba(255,255,255,1)');
+      gradient.addColorStop(0.3, 'rgba(255,255,255,0.5)');
+      gradient.addColorStop(0.6, 'rgba(255,255,255,0.15)');
+      gradient.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 128, 128);
+      glowTexture = new THREE.CanvasTexture(glowCanvas);
+      
+      // Points - colored by layer
+      const geometry = new THREE.BufferGeometry();
+      const positions = new Float32Array(projection.length * 3);
+      const colors = new Float32Array(projection.length * 3);
+
+      // Find max step for rainbow normalization
+      const maxStep = Math.max(...metadata.map(m => m.step !== undefined ? m.step : 0));
+      const numSteps = maxStep + 1;
+
+      for (let i = 0; i < projection.length; i++) {
+        const p = projection[i];
+        positions[i * 3] = p[0] * 2;
+        positions[i * 3 + 1] = p[1] * 2;
+        positions[i * 3 + 2] = p[2] * 2;
+
+        // Rainbow by step, subtle variations by layer
+        const step = metadata[i].step !== undefined ? metadata[i].step : 0;
+        const layer = metadata[i].layer;
+
+        // Main hue from step
+        const stepHue = (step / Math.max(1, numSteps - 1)) * 0.85;
+        // Subtle hue shift for layer (±0.03 around step hue)
+        const layerHueShift = ((layer / 15) - 0.5) * 0.06;
+        const hue = stepHue + layerHueShift;
+
+        // Lightness: deeper layers slightly darker
+        const lightness = 0.60 - (layer / 15) * 0.15;
+        // Saturation: deeper layers slightly more saturated
+        const saturation = 0.75 + (layer / 15) * 0.15;
+
+        const color = new THREE.Color().setHSL(hue, saturation, lightness);
+        colors[i * 3] = color.r;
+        colors[i * 3 + 1] = color.g;
+        colors[i * 3 + 2] = color.b;
+      }
+
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+      baseColors = new Float32Array(colors);
+      baseSizes = new Float32Array(projection.length).fill(0.06);
+
+      material = new THREE.PointsMaterial({
+        size: 0.06,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.9,
+        sizeAttenuation: true
+      });
+      
+      points = new THREE.Points(geometry, material);
+      scene.add(points);
+
+      // Flow arrows: for each position, draw step0-L0→step0-L1→...→step0-L15→step1-L0→...
+      const linePositions = [];
+      const lineColors = [];
+
+      // Build position->points map: {position: [{step, layer, idx, pos3d}, ...]}
+      const positionMap = new Map();
+      for (let i = 0; i < metadata.length; i++) {
+        const pos = metadata[i].position;
+        const step = metadata[i].step !== undefined ? metadata[i].step : 0;
+        if (!positionMap.has(pos)) positionMap.set(pos, []);
+        positionMap.get(pos).push({
+          step: step,
+          layer: metadata[i].layer,
+          idx: i,
+          pos3d: [positions[i*3], positions[i*3+1], positions[i*3+2]]
+        });
+      }
+
+      // For each position, sort by (step, layer) and draw flow path
+      for (const [pos, points] of positionMap.entries()) {
+        points.sort((a, b) => a.step !== b.step ? a.step - b.step : a.layer - b.layer);
+
+        // Find max step for this position's points
+        const maxStepLocal = Math.max(...points.map(p => p.step));
+        const numStepsLocal = maxStepLocal + 1;
+
+        for (let i = 0; i < points.length - 1; i++) {
+          const curr = points[i];
+          const next = points[i + 1];
+
+          linePositions.push(curr.pos3d[0], curr.pos3d[1], curr.pos3d[2]);
+          linePositions.push(next.pos3d[0], next.pos3d[1], next.pos3d[2]);
+
+          // Rainbow by step, subtle variations by layer
+          const stepHue = (curr.step / Math.max(1, numStepsLocal - 1)) * 0.85;
+          const layerHueShift = ((curr.layer / 15) - 0.5) * 0.06;
+          const hue = stepHue + layerHueShift;
+          const lightness = 0.60 - (curr.layer / 15) * 0.15;
+          const saturation = 0.75 + (curr.layer / 15) * 0.15;
+
+          const color = new THREE.Color().setHSL(hue, saturation, lightness);
+          lineColors.push(color.r, color.g, color.b);
+          lineColors.push(color.r, color.g, color.b);
+        }
+      }
+
+      const lineGeometry = new THREE.BufferGeometry();
+      lineGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(linePositions), 3));
+      lineGeometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(lineColors), 3));
+
+      const lineMaterial = new THREE.LineBasicMaterial({
+        vertexColors: true,
+        opacity: 0.2,
+        transparent: true
+      });
+
+      lines = new THREE.LineSegments(lineGeometry, lineMaterial);
+      scene.add(lines);
+
+      // Raycaster
+      const raycaster = new THREE.Raycaster();
+      raycaster.params.Points.threshold = 0.1;
+      const mouse = new THREE.Vector2();
+      
+      function updateCamera() {
+        camera.position.x = spherical.radius * Math.sin(spherical.phi) * Math.sin(spherical.theta);
+        camera.position.y = spherical.radius * Math.cos(spherical.phi);
+        camera.position.z = spherical.radius * Math.sin(spherical.phi) * Math.cos(spherical.theta);
+        camera.lookAt(0, 0, 0);
+      }
+      
+      container.addEventListener('mousedown', (e) => {
+        if (e.button === 0) { isDragging = true; autoRotate = false; previousMouse = { x: e.clientX, y: e.clientY }; }
+      });
+      container.addEventListener('mouseup', () => { isDragging = false; });
+      
+      container.addEventListener('mousemove', (e) => {
+        const rect = container.getBoundingClientRect();
+        mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+        mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+        
+        if (isDragging) {
+          spherical.theta -= (e.clientX - previousMouse.x) * 0.008;
+          spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi - (e.clientY - previousMouse.y) * 0.008));
+          previousMouse = { x: e.clientX, y: e.clientY };
+          updateCamera();
+        }
+        
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObject(points);
+        
+        if (intersects.length > 0) {
+          hoveredIdx = intersects[0].index;
+          const m = metadata[hoveredIdx];
+          infoPanel.classList.add('visible');
+          document.getElementById('info-step').textContent = m.step !== undefined ? m.step : 0;
+          document.getElementById('info-layer').textContent = m.layer;
+          document.getElementById('info-pos').textContent = m.position;
+          container.style.cursor = 'pointer';
+        } else {
+          hoveredIdx = null;
+          infoPanel.classList.remove('visible');
+          container.style.cursor = isDragging ? 'grabbing' : 'grab';
+        }
+      });
+      
+      container.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        spherical.radius = Math.max(2, Math.min(15, spherical.radius + e.deltaY * 0.005));
+        updateCamera();
+      }, { passive: false });
+      
+      updateCamera();
+      
+      function animate() {
+        requestAnimationFrame(animate);
+        if (autoRotate && !isFullPlaying) { spherical.theta += 0.001; updateCamera(); }
+        updatePlaybackVisualization();
+        renderer.render(scene, camera);
+      }
+      animate();
+      
+      window.addEventListener('resize', () => {
+        const w = container.clientWidth, h = container.clientHeight;
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+        renderer.setSize(w, h);
+      });
+    }
+  </script>
+</body>
+</html>
